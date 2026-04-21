@@ -100,6 +100,7 @@ const Notifications = (() => {
 
   async function deleteNotif(id) {
     await DB.dbDelete(DB.STORES.notifications, id);
+    Sync.afterDelete(DB.STORES.notifications, id);
     UI.showToast('Notification deleted', 'info');
     renderNotificationsPage();
   }
@@ -145,7 +146,7 @@ const Notifications = (() => {
     const message = document.getElementById('n-message').value.trim();
     if (!title || !message) { UI.showToast('Title and message are required', 'error'); return false; }
     const user = Auth.getCurrentUser();
-    await DB.dbAdd(DB.STORES.notifications, {
+    const data = {
       title, message,
       targetRole: document.getElementById('n-target').value,
       type: document.getElementById('n-type').value,
@@ -153,7 +154,10 @@ const Notifications = (() => {
       senderName: user.name,
       createdAt: new Date().toISOString(),
       read: []
-    });
+    };
+    const newId = await DB.dbAdd(DB.STORES.notifications, data);
+    data.id = newId;
+    Sync.afterWrite(DB.STORES.notifications, data);
     UI.showToast('Notification sent!', 'success');
     setTimeout(() => renderNotificationsPage(), 350);
     return true;

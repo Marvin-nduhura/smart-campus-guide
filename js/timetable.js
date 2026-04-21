@@ -223,8 +223,8 @@ const Timetable = (() => {
       notes: document.getElementById('tt-notes').value.trim(),
       createdAt: new Date().toISOString()
     };
-    if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.timetable, data); UI.showToast('Class updated!', 'success'); }
-    else { await DB.dbAdd(DB.STORES.timetable, data); UI.showToast('Class added!', 'success'); }
+    if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.timetable, data); Sync.afterWrite(DB.STORES.timetable, data); UI.showToast('Class updated!', 'success'); }
+    else { const newId = await DB.dbAdd(DB.STORES.timetable, data); data.id = newId; Sync.afterWrite(DB.STORES.timetable, data); UI.showToast('Class added!', 'success'); }
     setTimeout(() => renderTimetablePage(), 350);
     return true;
   }
@@ -232,6 +232,7 @@ const Timetable = (() => {
   async function deleteEntry(id) {
     UI.showConfirm('Remove this class from timetable?', async () => {
       await DB.dbDelete(DB.STORES.timetable, id);
+      Sync.afterDelete(DB.STORES.timetable, id);
       UI.showToast('Class removed', 'info');
       renderTimetablePage();
     });

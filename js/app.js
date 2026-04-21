@@ -909,8 +909,8 @@ async function saveUser(existingId = null) {
   if (!existingId && !password) { UI.showToast('Password required for new user', 'error'); return false; }
   const data = { name, username, email: document.getElementById('u-email').value.trim(), role: document.getElementById('u-role').value, permissions: [], createdAt: new Date().toISOString() };
   if (password) data.password = password;
-  if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.users, data); UI.showToast('User updated!', 'success'); }
-  else { await DB.dbAdd(DB.STORES.users, data); UI.showToast('User added!', 'success'); }
+  if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.users, data); Sync.afterWrite(DB.STORES.users, data); UI.showToast('User updated!', 'success'); }
+  else { const newId = await DB.dbAdd(DB.STORES.users, data); data.id = newId; Sync.afterWrite(DB.STORES.users, data); UI.showToast('User added!', 'success'); }
   renderAdminPage();
   return true;
 }
@@ -927,6 +927,7 @@ async function toggleAdminPermission(userId) {
     UI.showToast('Admin permission granted', 'success');
   }
   await DB.dbPut(DB.STORES.users, u);
+  Sync.afterWrite(DB.STORES.users, u);
   renderAdminPage();
 }
 
@@ -935,6 +936,7 @@ async function deleteUser(id) {
   if (current.id === id) { UI.showToast('Cannot delete your own account', 'error'); return; }
   UI.showConfirm('Delete this user?', async () => {
     await DB.dbDelete(DB.STORES.users, id);
+    Sync.afterDelete(DB.STORES.users, id);
     UI.showToast('User deleted', 'info');
     renderAdminPage();
   });

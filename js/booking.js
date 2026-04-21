@@ -220,8 +220,8 @@ const Booking = (() => {
       bookedBy: user.name,
       createdAt: new Date().toISOString()
     };
-    if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.bookings, data); UI.showToast('Booking updated!', 'success'); }
-    else { await DB.dbAdd(DB.STORES.bookings, data); UI.showToast('Room booked successfully!', 'success'); }
+    if (existingId) { data.id = existingId; await DB.dbPut(DB.STORES.bookings, data); Sync.afterWrite(DB.STORES.bookings, data); UI.showToast('Booking updated!', 'success'); }
+    else { const newId = await DB.dbAdd(DB.STORES.bookings, data); data.id = newId; Sync.afterWrite(DB.STORES.bookings, data); UI.showToast('Room booked successfully!', 'success'); }
     setTimeout(() => renderBookingsPage(), 350);
     return true;
   }
@@ -272,6 +272,7 @@ const Booking = (() => {
   async function deleteBooking(id) {
     UI.showConfirm('Cancel this booking?', async () => {
       await DB.dbDelete(DB.STORES.bookings, id);
+      Sync.afterDelete(DB.STORES.bookings, id);
       UI.showToast('Booking cancelled', 'info');
       renderBookingsPage();
     });
