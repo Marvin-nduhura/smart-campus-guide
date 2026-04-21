@@ -38,13 +38,13 @@
 /* ── Auth Page Bubbles ── */
 .auth-bg-animation {
   position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
-  background: linear-gradient(135deg, #0A3D0A 0%, #1B5E20 50%, #2E7D32 100%);
+  background: linear-gradient(135deg, #082d6b 0%, #0D47A1 50%, #1565C0 100%);
   background-size: 200% 200%;
   animation: gradientShift 10s ease infinite;
 }
 .bubble {
   position: absolute; border-radius: 50%;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.07);
   animation: bubbleFloat linear infinite;
 }
 .b1 { width: 80px; height: 80px; left: 10%; animation-duration: 8s; animation-delay: 0s; }
@@ -82,7 +82,7 @@
 /* ── Ongoing Banner ── */
 .ongoing-pulse {
   width: 12px; height: 12px; border-radius: 50%;
-  background: var(--green); flex-shrink: 0;
+  background: var(--accent); flex-shrink: 0;
   animation: ongoingPulse 2s ease infinite;
 }
 

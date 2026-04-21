@@ -3,8 +3,8 @@ const UI = (() => {
   function renderNav(active) {
     const user = Auth.getCurrentUser();
     if (!user) return '';
-    const roleColor = { admin: '#B71C1C', student: '#1B5E20', visitor: '#9A7B2F' };
-    const color = roleColor[user.role] || '#1B5E20';
+    const roleColor = { admin: '#C62828', student: '#0D47A1', visitor: '#546E7A' };
+    const color = roleColor[user.role] || '#0D47A1';
     return `
     <nav class="top-nav" style="--nav-color:${color}">
       <div class="nav-left">
@@ -411,8 +411,8 @@ async function renderDashboard() {
     (!n.read || !n.read.includes(user.id))
   );
   const greeting = getGreeting();
-  const roleColor = { admin: '#B71C1C', student: '#1B5E20', visitor: '#9A7B2F' };
-  const color = roleColor[user.role] || '#1B5E20';
+  const roleColor = { admin: '#C62828', student: '#0D47A1', visitor: '#546E7A' };
+  const color = roleColor[user.role] || '#0D47A1';
 
   app.innerHTML = `
   ${UI.renderNav('dashboard')}
@@ -432,11 +432,11 @@ async function renderDashboard() {
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card animate-fade-in" onclick="Router.navigate('buildings')" style="--stat-color:#1B5E20">
+      <div class="stat-card animate-fade-in" onclick="Router.navigate('buildings')" style="--stat-color:#0D47A1">
         <div class="stat-icon"><i class="fas fa-building"></i></div>
         <div class="stat-info"><span class="stat-num">${buildings.length}</span><span class="stat-label">Buildings</span></div>
       </div>
-      <div class="stat-card animate-fade-in" onclick="Router.navigate('buildings')" style="--stat-color:#C9A84C">
+      <div class="stat-card animate-fade-in" onclick="Router.navigate('buildings')" style="--stat-color:#FFD600">
         <div class="stat-icon"><i class="fas fa-door-open"></i></div>
         <div class="stat-info"><span class="stat-num">${rooms.length}</span><span class="stat-label">Rooms</span></div>
       </div>
@@ -445,7 +445,7 @@ async function renderDashboard() {
         <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
         <div class="stat-info"><span class="stat-num">${todayBookings.length}</span><span class="stat-label">Today's Bookings</span></div>
       </div>` : ''}
-      <div class="stat-card animate-fade-in" onclick="Router.navigate('notifications')" style="--stat-color:#B71C1C">
+      <div class="stat-card animate-fade-in" onclick="Router.navigate('notifications')" style="--stat-color:#C62828">
         <div class="stat-icon"><i class="fas fa-bell"></i></div>
         <div class="stat-info"><span class="stat-num">${unreadNotifs.length}</span><span class="stat-label">Unread Alerts</span></div>
       </div>
@@ -465,11 +465,11 @@ async function renderDashboard() {
       <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
       <div class="quick-grid">
         <button class="quick-btn" onclick="Router.navigate('map')">
-          <div class="quick-icon" style="background:#1B5E2020;color:#1B5E20"><i class="fas fa-map-marked-alt"></i></div>
+          <div class="quick-icon" style="background:#0D47A120;color:#0D47A1"><i class="fas fa-map-marked-alt"></i></div>
           <span>Campus Map</span>
         </button>
         <button class="quick-btn" onclick="Router.navigate('buildings')">
-          <div class="quick-icon" style="background:#C9A84C20;color:#9A7B2F"><i class="fas fa-building"></i></div>
+          <div class="quick-icon" style="background:#FFD60030;color:#B8A020"><i class="fas fa-building"></i></div>
           <span>Buildings</span>
         </button>
         <button class="quick-btn" onclick="Router.navigate('search')">
@@ -478,7 +478,7 @@ async function renderDashboard() {
         </button>
         ${user.role !== 'visitor' ? `
         <button class="quick-btn" onclick="Router.navigate('bookings')">
-          <div class="quick-icon" style="background:#4A148C20;color:#4A148C"><i class="fas fa-calendar-plus"></i></div>
+          <div class="quick-icon" style="background:#0D47A120;color:#0D47A1"><i class="fas fa-calendar-plus"></i></div>
           <span>Book Room</span>
         </button>
         <button class="quick-btn" onclick="Router.navigate('timetable')">
@@ -487,7 +487,7 @@ async function renderDashboard() {
         </button>` : ''}
         ${Auth.isAdmin() ? `
         <button class="quick-btn" onclick="Router.navigate('admin')">
-          <div class="quick-icon" style="background:#B71C1C20;color:#B71C1C"><i class="fas fa-cog"></i></div>
+          <div class="quick-icon" style="background:#C6282820;color:#C62828"><i class="fas fa-cog"></i></div>
           <span>Admin</span>
         </button>` : ''}
       </div>
@@ -522,7 +522,7 @@ async function renderDashboard() {
 }
 
 function renderMiniCard(b) {
-  const colors = { Administration: '#B71C1C', Academic: '#1B5E20', Library: '#0A3D0A', 'Student Services': '#C9A84C', default: '#1B5E20' };
+  const colors = { Administration: '#0D47A1', Academic: '#1565C0', Library: '#082d6b', 'Student Services': '#FFD600', default: '#0D47A1' };
   const icons = { Administration: 'fa-landmark', Academic: 'fa-graduation-cap', Library: 'fa-book', 'Student Services': 'fa-users', default: 'fa-building' };
   const color = colors[b.category] || colors.default;
   const icon = icons[b.category] || icons.default;
@@ -716,7 +716,7 @@ async function globalSearch(query) {
     resultsEl.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>No results for "' + query + '"</p></div>';
     return;
   }
-  const colors = { Administration: '#B71C1C', Academic: '#1B5E20', Library: '#0A3D0A', 'Student Services': '#C9A84C', default: '#1B5E20' };
+  const colors = { Administration: '#0D47A1', Academic: '#1565C0', Library: '#082d6b', 'Student Services': '#FFD600', default: '#0D47A1' };
   resultsEl.innerHTML = `
     ${matchB.length ? `<div class="results-section"><h4><i class="fas fa-building"></i> Buildings (${matchB.length})</h4>
     ${matchB.map(b => `
@@ -764,10 +764,10 @@ async function renderAdminPage() {
       <h2><i class="fas fa-cog"></i> Admin Panel</h2>
     </div>
     <div class="admin-stats">
-      <div class="admin-stat" style="--c:#1B5E20"><i class="fas fa-users"></i><span>${users.length}</span><p>Users</p></div>
-      <div class="admin-stat" style="--c:#C9A84C"><i class="fas fa-building"></i><span>${buildings.length}</span><p>Buildings</p></div>
+      <div class="admin-stat" style="--c:#0D47A1"><i class="fas fa-users"></i><span>${users.length}</span><p>Users</p></div>
+      <div class="admin-stat" style="--c:#FFD600"><i class="fas fa-building"></i><span>${buildings.length}</span><p>Buildings</p></div>
       <div class="admin-stat" style="--c:#00695C"><i class="fas fa-door-open"></i><span>${rooms.length}</span><p>Rooms</p></div>
-      <div class="admin-stat" style="--c:#B71C1C"><i class="fas fa-calendar-check"></i><span>${bookings.length}</span><p>Bookings</p></div>
+      <div class="admin-stat" style="--c:#C62828"><i class="fas fa-calendar-check"></i><span>${bookings.length}</span><p>Bookings</p></div>
     </div>
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="switchAdminTab('users',this)"><i class="fas fa-users"></i> Users</button>
@@ -944,8 +944,8 @@ async function renderProfilePage() {
   const app = document.getElementById('app');
   const user = Auth.getCurrentUser();
   const fullUser = user.id ? await DB.dbGet(DB.STORES.users, user.id) : user;
-  const roleColor = { admin: '#B71C1C', student: '#1B5E20', visitor: '#9A7B2F' };
-  const color = roleColor[user.role] || '#1B5E20';
+  const roleColor = { admin: '#C62828', student: '#0D47A1', visitor: '#546E7A' };
+  const color = roleColor[user.role] || '#0D47A1';
 
   app.innerHTML = `
   ${UI.renderNav('profile')}
