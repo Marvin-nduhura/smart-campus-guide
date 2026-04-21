@@ -1,51 +1,30 @@
 /**
- * Sync — multi-user data sharing, zero flicker
- * No localStorage noise, no recursive patches, no audio side-effects.
+ * Sync — server-first data layer
+ * All reads come from the server when online.
+ * Local IndexedDB is only a fallback for offline use.
  */
 const Sync = (() => {
   const API_BASE = window.location.origin + '/api';
-  let channel = null;
-  let pollTimer = null;
   let sseSource = null;
+  let pollTimer = null;
   let serverAvailable = false;
-  let _patched = false;
   let _refreshTimer = null;
+  let _channel = null;
 
-  // Coalesced refresh — max one repaint per 800ms, never during navigation
+  // ── Coalesced UI refresh ────────────────────────────────────────────────────
   function scheduleRefresh() {
     clearTimeout(_refreshTimer);
     _refreshTimer = setTimeout(() => {
       Router.silentRefresh();
       Notifications.updateNotifBadge();
-    }, 800);
+    }, 400);
   }
 
-  // ── BroadcastChannel ────────────────────────────────────────────────────────
-  function initBroadcast() {
-    if (!('BroadcastChannel' in window)) return;
-    try {
-      channel = new BroadcastChannel('ku_campus_v2');
-      channel.onmessage = async ({ data: msg }) => {
-        if (!msg || !msg.type) return;
-        try {
-          if (msg.type === 'upsert') await DB._put(msg.store, msg.data);
-          else if (msg.type === 'delete') await DB._delete(msg.store, msg.id);
-          scheduleRefresh();
-        } catch (_) {}
-      };
-    } catch (_) {}
-  }
-
-  function broadcast(type, store, payload) {
-    if (!channel) return;
-    try { channel.postMessage({ type, store, ...payload }); } catch (_) {}
-  }
-
-  // ── Server ──────────────────────────────────────────────────────────────────
+  // ── Ping ────────────────────────────────────────────────────────────────────
   async function ping() {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 2000);
+      const t = setTimeout(() => ctrl.abort(), 3000);
       const r = await fetch(API_BASE + '/ping', { signal: ctrl.signal, cache: 'no-store' });
       clearTimeout(t);
       serverAvailable = r.ok;
@@ -53,134 +32,191 @@ const Sync = (() => {
     return serverAvailable;
   }
 
-  async function push(store, data) {
-    if (!serverAvailable) return;
+  // ── Pull full store from server → replace local DB ──────────────────────────
+  async function pullStore(store) {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 4000);
-      await fetch(`${API_BASE}/${store}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        signal: ctrl.signal
-      });
-      clearTimeout(t);
-    } catch (_) {}
-  }
-
-  async function del(store, id) {
-    if (!serverAvailable) return;
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 4000);
-      await fetch(`${API_BASE}/${store}/${id}`, { method: 'DELETE', signal: ctrl.signal });
-      clearTimeout(t);
-    } catch (_) {}
-  }
-
-  async function pull(store) {
-    if (!serverAvailable) return false;
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 5000);
+      const t = setTimeout(() => ctrl.abort(), 8000);
       const r = await fetch(`${API_BASE}/${store}`, { cache: 'no-store', signal: ctrl.signal });
       clearTimeout(t);
       if (!r.ok) return false;
       const items = await r.json();
-      for (const item of items) await DB._put(store, item);
+      // Replace entire local store with server data
+      const existing = await DB.dbGetAll(store);
+      // Delete items no longer on server
+      const serverIds = new Set(items.map(i => i.id));
+      for (const item of existing) {
+        if (!serverIds.has(item.id)) await DB.dbDelete(store, item.id);
+      }
+      // Upsert all server items
+      for (const item of items) await DB.dbPut(store, item);
       return true;
     } catch (_) { return false; }
   }
 
-  // ── Selective polling ───────────────────────────────────────────────────────
-  const ROUTE_STORES = {
-    dashboard:        ['buildings', 'rooms', 'bookings', 'notifications'],
-    buildings:        ['buildings', 'rooms'],
-    'building-detail':['buildings', 'rooms'],
-    bookings:         ['bookings', 'rooms'],
-    notifications:    ['notifications'],
-    timetable:        ['timetable', 'rooms'],
-    admin:            ['users', 'buildings', 'rooms', 'bookings'],
-    search:           ['buildings', 'rooms'],
-    map:              [],
-    login:            [],
-    profile:          []
-  };
-
-  async function pollNow() {
-    const route = Router.getCurrentRoute() || '';
-    const stores = ROUTE_STORES[route] || ['buildings', 'rooms'];
-    let changed = false;
-    for (const s of stores) { if (await pull(s)) changed = true; }
-    if (changed) scheduleRefresh();
+  // ── Push a write to server (with retry) ─────────────────────────────────────
+  async function push(store, data) {
+    // Try up to 3 times
+    for (let i = 0; i < 3; i++) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch(`${API_BASE}/${store}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          signal: ctrl.signal
+        });
+        clearTimeout(t);
+        if (r.ok) { serverAvailable = true; return true; }
+      } catch (_) {}
+      await new Promise(res => setTimeout(res, 1000 * (i + 1)));
+    }
+    serverAvailable = false;
+    return false;
   }
 
-  function startPolling(ms = 25000) {
-    stopPolling();
-    ping().then(ok => {
-      if (!ok) return;
-      pollNow();
-      pollTimer = setInterval(pollNow, ms);
-    });
+  // ── Push a delete to server ──────────────────────────────────────────────────
+  async function del(store, id) {
+    for (let i = 0; i < 3; i++) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch(`${API_BASE}/${store}/${id}`, { method: 'DELETE', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) return true;
+      } catch (_) {}
+      await new Promise(res => setTimeout(res, 1000 * (i + 1)));
+    }
+    return false;
   }
 
-  function stopPolling() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  // ── Server-first read: fetch from server, update local, return data ──────────
+  async function getAll(store) {
+    if (serverAvailable) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch(`${API_BASE}/${store}`, { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+          const items = await r.json();
+          // Sync to local DB in background
+          const existing = await DB.dbGetAll(store);
+          const serverIds = new Set(items.map(i => i.id));
+          for (const item of existing) {
+            if (!serverIds.has(item.id)) await DB.dbDelete(store, item.id);
+          }
+          for (const item of items) await DB.dbPut(store, item);
+          return items;
+        }
+      } catch (_) {}
+    }
+    // Fallback to local
+    return DB.dbGetAll(store);
   }
 
-  // ── SSE ─────────────────────────────────────────────────────────────────────
+  // ── Called after every local write ──────────────────────────────────────────
+  function afterWrite(store, data) {
+    // Broadcast to other tabs on same device
+    if (_channel) {
+      try { _channel.postMessage({ type: 'upsert', store, data }); } catch (_) {}
+    }
+    // Push to server (async, don't block UI)
+    push(store, data);
+  }
+
+  // ── Called after every local delete ─────────────────────────────────────────
+  function afterDelete(store, id) {
+    if (_channel) {
+      try { _channel.postMessage({ type: 'delete', store, id }); } catch (_) {}
+    }
+    del(store, id);
+  }
+
+  // ── SSE for real-time push from server ───────────────────────────────────────
   function connectSSE() {
-    if (!serverAvailable) return;
     if (sseSource) { try { sseSource.close(); } catch (_) {} sseSource = null; }
     try {
       sseSource = new EventSource(API_BASE + '/events');
       sseSource.addEventListener('update', async ({ data }) => {
-        try { const { store, data: d } = JSON.parse(data); await DB._put(store, d); scheduleRefresh(); } catch (_) {}
+        try {
+          const { store, data: d } = JSON.parse(data);
+          await DB.dbPut(store, d);
+          scheduleRefresh();
+        } catch (_) {}
       });
       sseSource.addEventListener('delete', async ({ data }) => {
-        try { const { store, id } = JSON.parse(data); await DB._delete(store, id); scheduleRefresh(); } catch (_) {}
+        try {
+          const { store, id } = JSON.parse(data);
+          await DB.dbDelete(store, id);
+          scheduleRefresh();
+        } catch (_) {}
       });
       sseSource.onerror = () => {
         try { sseSource.close(); } catch (_) {}
         sseSource = null;
-        setTimeout(() => { if (serverAvailable) connectSSE(); }, 10000);
+        // Reconnect after 8s
+        setTimeout(() => { if (serverAvailable) connectSSE(); }, 8000);
       };
     } catch (_) {}
   }
 
-  // ── DB patch — store originals as _put/_delete/_add ─────────────────────────
-  function patchDB() {
-    if (_patched) return;
-    _patched = true;
+  // ── Polling fallback (every 10s) ─────────────────────────────────────────────
+  const ROUTE_STORES = {
+    dashboard:         ['buildings', 'rooms', 'bookings', 'notifications'],
+    buildings:         ['buildings', 'rooms'],
+    'building-detail': ['buildings', 'rooms'],
+    bookings:          ['bookings', 'rooms'],
+    notifications:     ['notifications'],
+    timetable:         ['timetable', 'rooms'],
+    admin:             ['users', 'buildings', 'rooms', 'bookings'],
+    search:            ['buildings', 'rooms'],
+    map:               ['buildings'],
+    login:             [],
+    profile:           ['users']
+  };
 
-    // Raw methods — used internally, never broadcast
-    DB._put    = (store, data) => DB.dbPut(store, data);
-    DB._delete = (store, id)   => DB.dbDelete(store, id);
-    DB._add    = (store, data) => DB.dbAdd(store, data);
-
-    // We do NOT patch dbAdd/dbPut/dbDelete here to avoid recursion.
-    // Instead, every write site calls Sync.afterWrite() explicitly.
+  async function pollNow() {
+    if (!serverAvailable) { await ping(); if (!serverAvailable) return; }
+    const route = Router.getCurrentRoute() || '';
+    const stores = ROUTE_STORES[route] || [];
+    let changed = false;
+    for (const s of stores) { if (await pullStore(s)) changed = true; }
+    if (changed) scheduleRefresh();
   }
 
-  // Call this after any local write to broadcast + push
-  function afterWrite(store, data) {
-    broadcast('upsert', store, { data });
-    push(store, data);
+  // ── BroadcastChannel (same-device multi-tab) ─────────────────────────────────
+  function initBroadcast() {
+    if (!('BroadcastChannel' in window)) return;
+    try {
+      _channel = new BroadcastChannel('ku_campus_v3');
+      _channel.onmessage = async ({ data: msg }) => {
+        if (!msg) return;
+        try {
+          if (msg.type === 'upsert') { await DB.dbPut(msg.store, msg.data); scheduleRefresh(); }
+          else if (msg.type === 'delete') { await DB.dbDelete(msg.store, msg.id); scheduleRefresh(); }
+        } catch (_) {}
+      };
+    } catch (_) {}
   }
 
-  function afterDelete(store, id) {
-    broadcast('delete', store, { id });
-    del(store, id);
-  }
-
-  function init() {
-    patchDB();
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  async function init() {
     initBroadcast();
-    startPolling();
-    ping().then(ok => { if (ok) connectSSE(); });
+    const ok = await ping();
+    if (ok) {
+      // Pull all stores on startup so every device starts fresh from server
+      const allStores = ['buildings', 'rooms', 'bookings', 'notifications', 'timetable', 'users'];
+      for (const s of allStores) await pullStore(s);
+      scheduleRefresh();
+      connectSSE();
+    }
+    // Poll every 10 seconds as fallback
+    pollTimer = setInterval(pollNow, 10000);
   }
 
-  return { init, afterWrite, afterDelete, scheduleRefresh, startPolling, stopPolling };
+  return { init, afterWrite, afterDelete, getAll, scheduleRefresh };
 })();
 
 window.Sync = Sync;

@@ -207,5 +207,10 @@ window.DB = {
   // Direct IDB methods used by Sync (never patched, never broadcast)
   _put:    dbPut,
   _delete: dbDelete,
-  _add:    dbAdd
+  _add:    dbAdd,
+  // Server-first getAll — used by all pages after Sync is initialized
+  serverGetAll: async (store) => {
+    if (window.Sync && Sync.getAll) return Sync.getAll(store);
+    return dbGetAll(store);
+  }
 };

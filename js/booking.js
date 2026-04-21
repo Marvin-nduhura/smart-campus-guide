@@ -4,10 +4,10 @@ const Booking = (() => {
   async function renderBookingsPage() {
     const app = document.getElementById('app');
     const user = Auth.getCurrentUser();
-    const allBookings = await DB.dbGetAll(DB.STORES.bookings);
+    const allBookings = await DB.serverGetAll(DB.STORES.bookings);
     const myBookings = user.role === 'admin' ? allBookings : allBookings.filter(b => b.userId === user.id);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
-    const buildings = await DB.dbGetAll(DB.STORES.buildings);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
+    const buildings = await DB.serverGetAll(DB.STORES.buildings);
     const roomMap = {};
     rooms.forEach(r => roomMap[r.id] = r);
     const buildingMap = {};
@@ -139,7 +139,7 @@ const Booking = (() => {
   }
 
   async function showNewBooking() {
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     const campusRooms = rooms.filter(r => r.isCampus);
     UI.showModal({
       title: '<i class="fas fa-calendar-plus"></i> New Booking',

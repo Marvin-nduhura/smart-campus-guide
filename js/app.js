@@ -397,10 +397,10 @@ window.UI = UI;
 async function renderDashboard() {
   const app = document.getElementById('app');
   const user = Auth.getCurrentUser();
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
-  const rooms = await DB.dbGetAll(DB.STORES.rooms);
-  const bookings = await DB.dbGetAll(DB.STORES.bookings);
-  const notifications = await DB.dbGetAll(DB.STORES.notifications);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
+  const rooms = await DB.serverGetAll(DB.STORES.rooms);
+  const bookings = await DB.serverGetAll(DB.STORES.bookings);
+  const notifications = await DB.serverGetAll(DB.STORES.notifications);
   const now = new Date();
   const todayBookings = bookings.filter(b => {
     const s = new Date(b.startTime);
@@ -551,7 +551,7 @@ async function renderMapPage() {
     MapModule.initMap('campus-map');
     return;
   }
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
   app.innerHTML = `
   ${UI.renderNav('map')}
   <div class="map-page">
@@ -604,7 +604,7 @@ async function renderMapPage() {
 }
 
 async function showAllOnMap() {
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
   MapModule.showAllMarkers(buildings);
   UI.showToast(`Showing ${buildings.length} buildings`, 'info');
 }
@@ -631,8 +631,8 @@ async function searchOnMap(query) {
   }
   clearBtn.classList.remove('hidden');
   const q = query.toLowerCase();
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
-  const rooms = await DB.dbGetAll(DB.STORES.rooms);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
+  const rooms = await DB.serverGetAll(DB.STORES.rooms);
   const matchBuildings = buildings.filter(b => b.name.toLowerCase().includes(q));
   const matchRooms = rooms.filter(r => r.name.toLowerCase().includes(q));
   if (!matchBuildings.length && !matchRooms.length) {
@@ -707,8 +707,8 @@ async function globalSearch(query) {
     return;
   }
   const q = query.toLowerCase();
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
-  const rooms = await DB.dbGetAll(DB.STORES.rooms);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
+  const rooms = await DB.serverGetAll(DB.STORES.rooms);
   const buildingMap = {};
   buildings.forEach(b => buildingMap[b.id] = b);
   const matchB = buildings.filter(b => b.name.toLowerCase().includes(q) || (b.description || '').toLowerCase().includes(q) || (b.category || '').toLowerCase().includes(q));
@@ -753,10 +753,10 @@ async function globalSearch(query) {
 async function renderAdminPage() {
   const app = document.getElementById('app');
   if (!Auth.isAdmin()) { UI.showToast('Access denied', 'error'); Router.navigate('dashboard'); return; }
-  const users = await DB.dbGetAll(DB.STORES.users);
-  const buildings = await DB.dbGetAll(DB.STORES.buildings);
-  const rooms = await DB.dbGetAll(DB.STORES.rooms);
-  const bookings = await DB.dbGetAll(DB.STORES.bookings);
+  const users = await DB.serverGetAll(DB.STORES.users);
+  const buildings = await DB.serverGetAll(DB.STORES.buildings);
+  const rooms = await DB.serverGetAll(DB.STORES.rooms);
+  const bookings = await DB.serverGetAll(DB.STORES.bookings);
 
   app.innerHTML = `
   ${UI.renderNav('admin')}
@@ -819,11 +819,11 @@ async function switchAdminTab(tab, btn) {
   btn.classList.add('active');
   const content = document.getElementById('admin-tab-content');
   if (tab === 'users') {
-    const users = await DB.dbGetAll(DB.STORES.users);
+    const users = await DB.serverGetAll(DB.STORES.users);
     content.innerHTML = renderUsersTab(users);
   } else if (tab === 'buildings-admin') {
-    const buildings = await DB.dbGetAll(DB.STORES.buildings);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const buildings = await DB.serverGetAll(DB.STORES.buildings);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     content.innerHTML = `
     <div class="admin-section">
       <div class="section-header">
@@ -845,8 +845,8 @@ async function switchAdminTab(tab, btn) {
       </div>
     </div>`;
   } else if (tab === 'bookings-admin') {
-    const bookings = await DB.dbGetAll(DB.STORES.bookings);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const bookings = await DB.serverGetAll(DB.STORES.bookings);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     const roomMap = {};
     rooms.forEach(r => roomMap[r.id] = r);
     content.innerHTML = `

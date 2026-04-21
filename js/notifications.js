@@ -4,7 +4,7 @@ const Notifications = (() => {
   async function renderNotificationsPage() {
     const app = document.getElementById('app');
     const user = Auth.getCurrentUser();
-    const all = await DB.dbGetAll(DB.STORES.notifications);
+    const all = await DB.serverGetAll(DB.STORES.notifications);
     const mine = all.filter(n =>
       n.targetRole === 'all' ||
       n.targetRole === user.role ||
@@ -88,7 +88,7 @@ const Notifications = (() => {
 
   async function markAllRead() {
     const user = Auth.getCurrentUser();
-    const all = await DB.dbGetAll(DB.STORES.notifications);
+    const all = await DB.serverGetAll(DB.STORES.notifications);
     for (const n of all) {
       if (!n.read) n.read = [];
       if (!n.read.includes(user.id)) { n.read.push(user.id); await DB.dbPut(DB.STORES.notifications, n); }
@@ -167,7 +167,7 @@ const Notifications = (() => {
     const user = Auth.getCurrentUser();
     if (!user) return;
     try {
-      const all = await DB.dbGetAll(DB.STORES.notifications);
+      const all = await DB.serverGetAll(DB.STORES.notifications);
       const unread = all.filter(n =>
         (n.targetRole === 'all' || n.targetRole === user.role) &&
         (!n.read || !n.read.includes(user.id))

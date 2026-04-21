@@ -7,7 +7,7 @@ const Timetable = (() => {
     const app = document.getElementById('app');
     const user = Auth.getCurrentUser();
     const entries = await DB.dbGetByIndex(DB.STORES.timetable, 'userId', user.id);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     const roomMap = {};
     rooms.forEach(r => roomMap[r.id] = r);
 
@@ -102,7 +102,7 @@ const Timetable = (() => {
     btn.classList.add('active');
     const user = Auth.getCurrentUser();
     const entries = await DB.dbGetByIndex(DB.STORES.timetable, 'userId', user.id);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     const roomMap = {};
     rooms.forEach(r => roomMap[r.id] = r);
     const content = document.getElementById('timetable-content');
@@ -135,7 +135,7 @@ const Timetable = (() => {
   }
 
   async function showAddEntry() {
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     UI.showModal({
       title: '<i class="fas fa-plus-circle"></i> Add Class',
       body: entryForm(rooms),
@@ -145,7 +145,7 @@ const Timetable = (() => {
 
   async function showEditEntry(id) {
     const e = await DB.dbGet(DB.STORES.timetable, id);
-    const rooms = await DB.dbGetAll(DB.STORES.rooms);
+    const rooms = await DB.serverGetAll(DB.STORES.rooms);
     UI.showModal({
       title: '<i class="fas fa-edit"></i> Edit Class',
       body: entryForm(rooms, e),

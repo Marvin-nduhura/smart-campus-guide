@@ -3,7 +3,7 @@ const Buildings = (() => {
 
   async function renderBuildingsPage() {
     const app = document.getElementById('app');
-    const buildings = await DB.dbGetAll(DB.STORES.buildings);
+    const buildings = await DB.serverGetAll(DB.STORES.buildings);
     const canEdit = Auth.canEdit();
     app.innerHTML = `
     ${UI.renderNav('buildings')}
@@ -101,7 +101,7 @@ const Buildings = (() => {
   function viewOnMap(id, lat, lng) {
     Router.navigate('map');
     setTimeout(async () => {
-      const buildings = await DB.dbGetAll(DB.STORES.buildings);
+      const buildings = await DB.serverGetAll(DB.STORES.buildings);
       buildings.forEach(b => MapModule.addBuildingMarker(b));
       MapModule.focusMarker(id);
     }, 600);
