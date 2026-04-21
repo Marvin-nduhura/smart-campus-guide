@@ -90,9 +90,6 @@ const Auth = (() => {
             <button class="btn-primary btn-full" onclick="Auth.handleLogin()">
               <i class="fas fa-sign-in-alt"></i> Sign In
             </button>
-            <div class="auth-hint">
-              <small><i class="fas fa-info-circle"> </small>
-            </div>
           </div>
           <div id="visitor-tab" class="tab-content">
             <div class="visitor-info">
