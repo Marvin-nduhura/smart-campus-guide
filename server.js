@@ -159,6 +159,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Direct login endpoint — avoids sending all users to client
+  if (pathname === '/api/login' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { username, password } = JSON.parse(body || '{}');
+        const users = await getAll('users');
+        const user = users.find(u => u.username === username && u.password === password);
+        if (user) {
+          const { password: _, ...safeUser } = user;
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ success: true, user: safeUser }));
+        } else {
+          res.writeHead(401, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ success: false, message: 'Invalid username or password' }));
+        }
+      } catch(e) {
+        res.writeHead(400); res.end('Bad request');
+      }
+    });
+    return;
+  }
+
   // API routes
   const m = pathname.match(/^\/api\/(\w+)\/?(\d+)?$/);
   if (m) {
@@ -210,6 +234,19 @@ const server = http.createServer(async (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 ensureFile();
+// Seed admin into JSON file if users array is empty
+(function seedJsonFile() {
+  const d = readFile();
+  if (!d.users || d.users.length === 0) {
+    d.users = [{
+      id: 1, username: 'admin', password: 'admin123', role: 'admin',
+      name: 'System Administrator', email: 'admin@kab.ac.ug',
+      avatar: null, permissions: ['all'], createdAt: new Date().toISOString()
+    }];
+    writeFile(d);
+    console.log('   ✅ Default admin seeded into JSON file (admin/admin123)');
+  }
+})();
 initDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     const ips = Object.values(require('os').networkInterfaces()).flat()

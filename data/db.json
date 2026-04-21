@@ -28,7 +28,19 @@
     }
   ],
   "notifications": [],
-  "users": [],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "admin123",
+      "role": "admin",
+      "name": "System Administrator",
+      "email": "admin@kab.ac.ug",
+      "avatar": null,
+      "permissions": ["all"],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
   "timetable": [
     {
       "userId": 1,
