@@ -1,198 +1,185 @@
 /**
- * Smart Campus Guide – Server with MongoDB Atlas persistence
- * Run: node server.js
+ * Smart Campus Guide – Server
+ * Database: Turso (libSQL) with JSON file fallback
  */
 const http = require('http');
 const path = require('path');
-const url = require('url');
+const fs   = require('fs');
 
-const PORT = process.env.PORT || 3000;
-const MONGO_URI = process.env.MONGO_URI || null;
+const PORT       = process.env.PORT || 3000;
+const TURSO_URL  = process.env.TURSO_URL  || null;
+const TURSO_TOKEN= process.env.TURSO_TOKEN|| null;
 
-// ── MIME types ────────────────────────────────────────────────────────────────
+const STORES = ['buildings','rooms','bookings','notifications','users','timetable'];
+
 const MIME = {
-  '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
-  '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webp': 'image/webp'
+  '.html':'text/html','.css':'text/css','.js':'application/javascript',
+  '.json':'application/json','.png':'image/png','.jpg':'image/jpeg',
+  '.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp'
 };
 
-// ── SSE clients ───────────────────────────────────────────────────────────────
+// ── SSE ───────────────────────────────────────────────────────────────────────
 const sseClients = new Set();
 function pushToClients(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  sseClients.forEach(res => { try { res.write(msg); } catch (_) { sseClients.delete(res); } });
+  sseClients.forEach(r => { try { r.write(msg); } catch(_){ sseClients.delete(r); }});
 }
 
-// ── DB layer (MongoDB or fallback JSON file) ──────────────────────────────────
-let dbLayer = null;
+// ── DB layer ──────────────────────────────────────────────────────────────────
+let db = null;
 
 async function initDB() {
-  if (MONGO_URI) {
+  if (TURSO_URL && TURSO_TOKEN) {
     try {
-      const { MongoClient } = require('mongodb');
-      const client = new MongoClient(MONGO_URI, {
-        serverSelectionTimeoutMS: 15000,
-        connectTimeoutMS: 15000
-      });
-      await client.connect();
-      const mdb = client.db('smart_campus');
-      console.log('   ✅ Connected to MongoDB Atlas');
-      dbLayer = {
-        async getAll(store) {
-          return mdb.collection(store).find({}).toArray();
-        },
-        async upsert(store, data) {
-          await mdb.collection(store).replaceOne({ id: data.id }, data, { upsert: true });
-          return data;
-        },
-        async remove(store, id) {
-          await mdb.collection(store).deleteOne({ id: Number(id) });
-        }
-      };
-    } catch (e) {
-      console.error('   ⚠️  MongoDB connection failed, falling back to JSON file:', e.message);
-      dbLayer = makeFileDB();
+      const { createClient } = require('@libsql/client');
+      db = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
+      // Create tables for each store
+      for (const store of STORES) {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS ${store} (
+            id    INTEGER PRIMARY KEY,
+            data  TEXT NOT NULL
+          )
+        `);
+      }
+      console.log('   ✅ Connected to Turso database');
+      return;
+    } catch(e) {
+      console.error('   ⚠️  Turso connection failed, using JSON file:', e.message);
+      db = null;
     }
   } else {
-    console.log('   ℹ️  No MONGO_URI set, using local JSON file');
-    dbLayer = makeFileDB();
+    console.log('   ℹ️  No TURSO_URL/TOKEN set, using local JSON file');
   }
 }
 
-function makeFileDB() {
-  const fs = require('fs');
-  const DATA_FILE = path.join(__dirname, 'data', 'db.json');
-  if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
-  if (!fs.existsSync(DATA_FILE)) {
+// ── Turso helpers ─────────────────────────────────────────────────────────────
+async function tursoGetAll(store) {
+  const rs = await db.execute(`SELECT data FROM ${store}`);
+  return rs.rows.map(r => JSON.parse(r.data));
+}
+
+async function tursoUpsert(store, item) {
+  const id = item.id;
+  const data = JSON.stringify(item);
+  await db.execute({
+    sql: `INSERT INTO ${store}(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data`,
+    args: [id, data]
+  });
+  return item;
+}
+
+async function tursoDelete(store, id) {
+  await db.execute({ sql: `DELETE FROM ${store} WHERE id=?`, args: [Number(id)] });
+}
+
+// ── JSON file fallback ────────────────────────────────────────────────────────
+const DATA_FILE = path.join(__dirname, 'data', 'db.json');
+function ensureFile() {
+  if (!fs.existsSync(path.join(__dirname,'data'))) fs.mkdirSync(path.join(__dirname,'data'));
+  if (!fs.existsSync(DATA_FILE))
     fs.writeFileSync(DATA_FILE, JSON.stringify(
-      { buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: [] }, null, 2
-    ));
-  }
-  function read() {
-    try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-    catch (_) { return { buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: [] }; }
-  }
-  function write(data) { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
-  return {
-    async getAll(store) { return read()[store] || []; },
-    async upsert(store, data) {
-      const db = read();
-      if (!db[store]) db[store] = [];
-      const idx = db[store].findIndex(i => i.id === data.id);
-      if (idx >= 0) db[store][idx] = data; else db[store].push(data);
-      write(db); return data;
-    },
-    async remove(store, id) {
-      const db = read();
-      if (!db[store]) return;
-      db[store] = db[store].filter(i => i.id !== Number(id));
-      write(db);
-    }
-  };
+      {buildings:[],rooms:[],bookings:[],notifications:[],users:[],timetable:[]}, null, 2));
 }
+function readFile() {
+  try { return JSON.parse(fs.readFileSync(DATA_FILE,'utf8')); }
+  catch(_){ return {buildings:[],rooms:[],bookings:[],notifications:[],users:[],timetable:[]}; }
+}
+function writeFile(d) { fs.writeFileSync(DATA_FILE, JSON.stringify(d,null,2)); }
 
-// ── Request handler ───────────────────────────────────────────────────────────
+function fileGetAll(store)      { return readFile()[store] || []; }
+function fileUpsert(store, item){ const d=readFile(); if(!d[store])d[store]=[]; const i=d[store].findIndex(x=>x.id===item.id); if(i>=0)d[store][i]=item; else d[store].push(item); writeFile(d); return item; }
+function fileDelete(store, id)  { const d=readFile(); if(!d[store])return; d[store]=d[store].filter(x=>x.id!==Number(id)); writeFile(d); }
+
+// ── Unified DB API ────────────────────────────────────────────────────────────
+async function getAll(store)       { return db ? tursoGetAll(store)      : fileGetAll(store); }
+async function upsert(store, item) { return db ? tursoUpsert(store,item) : fileUpsert(store,item); }
+async function remove(store, id)   { return db ? tursoDelete(store,id)   : fileDelete(store,id); }
+
+// ── HTTP server ───────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
-  const parsed = url.parse(req.url, true);
-  const pathname = parsed.pathname;
+  const { pathname } = new URL(req.url, `http://localhost`);
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if (req.method==='OPTIONS'){ res.writeHead(204); res.end(); return; }
 
   // SSE
-  if (pathname === '/api/events') {
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+  if (pathname==='/api/events') {
+    res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});
     res.write('data: connected\n\n');
     sseClients.add(res);
-    req.on('close', () => sseClients.delete(res));
+    req.on('close',()=>sseClients.delete(res));
     return;
   }
 
   // Ping
-  if (pathname === '/api/ping') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, time: new Date().toISOString() }));
+  if (pathname==='/api/ping') {
+    res.writeHead(200,{'Content-Type':'application/json'});
+    res.end(JSON.stringify({ok:true,db: db?'turso':'file', time:new Date().toISOString()}));
     return;
   }
 
-  // API routes
-  const apiMatch = pathname.match(/^\/api\/(\w+)\/?(\d+)?$/);
-  if (apiMatch) {
-    const store = apiMatch[1];
-    const id = apiMatch[2] ? parseInt(apiMatch[2]) : null;
-    const validStores = ['buildings', 'rooms', 'bookings', 'notifications', 'users', 'timetable'];
-    if (!validStores.includes(store)) { res.writeHead(404); res.end('Not found'); return; }
-
+  // API /api/:store or /api/:store/:id
+  const m = pathname.match(/^\/api\/(\w+)\/?(\d+)?$/);
+  if (m) {
+    const store = m[1], id = m[2] ? parseInt(m[2]) : null;
+    if (!STORES.includes(store)){ res.writeHead(404); res.end('Not found'); return; }
     try {
-      if (req.method === 'GET') {
-        const items = await dbLayer.getAll(store);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        if (id !== null) {
-          res.end(JSON.stringify(items.find(i => i.id === id) || null));
-        } else {
-          // Strip MongoDB _id field
-          res.end(JSON.stringify(items.map(({ _id, ...rest }) => rest)));
-        }
+      if (req.method==='GET') {
+        const items = await getAll(store);
+        res.writeHead(200,{'Content-Type':'application/json'});
+        res.end(JSON.stringify(id!==null ? (items.find(i=>i.id===id)||null) : items));
         return;
       }
-
-      let body = '';
-      req.on('data', chunk => body += chunk);
-      req.on('end', async () => {
+      let body='';
+      req.on('data',c=>body+=c);
+      req.on('end', async()=>{
         try {
-          const data = JSON.parse(body || '{}');
-          if (req.method === 'POST') {
-            const saved = await dbLayer.upsert(store, data);
-            pushToClients('update', { store, data: saved });
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (req.method==='POST') {
+            const item = JSON.parse(body||'{}');
+            const saved = await upsert(store, item);
+            pushToClients('update',{store,data:saved});
+            res.writeHead(200,{'Content-Type':'application/json'});
             res.end(JSON.stringify(saved));
-          } else if (req.method === 'DELETE' && id !== null) {
-            await dbLayer.remove(store, id);
-            pushToClients('delete', { store, id });
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true }));
-          } else {
-            res.writeHead(405); res.end('Method not allowed');
-          }
-        } catch (e) { res.writeHead(400); res.end('Bad request'); }
+          } else if (req.method==='DELETE' && id!==null) {
+            await remove(store, id);
+            pushToClients('delete',{store,id});
+            res.writeHead(200,{'Content-Type':'application/json'});
+            res.end(JSON.stringify({ok:true}));
+          } else { res.writeHead(405); res.end('Method not allowed'); }
+        } catch(e){ res.writeHead(400); res.end('Bad request'); }
       });
-    } catch (e) {
-      res.writeHead(500); res.end('Server error');
-    }
+    } catch(e){ res.writeHead(500); res.end('Server error: '+e.message); }
     return;
   }
 
   // Static files
-  const fs = require('fs');
-  let filePath = pathname === '/' ? '/index.html' : pathname;
-  filePath = path.join(__dirname, filePath);
-  const ext = path.extname(filePath);
-  fs.readFile(filePath, (err, data) => {
+  let fp = pathname==='/' ? '/index.html' : pathname;
+  fp = path.join(__dirname, fp);
+  fs.readFile(fp,(err,data)=>{
     if (err) {
-      fs.readFile(path.join(__dirname, 'index.html'), (e2, d2) => {
-        if (e2) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(d2);
-      });
-      return;
+      fs.readFile(path.join(__dirname,'index.html'),(e2,d2)=>{
+        if(e2){ res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200,{'Content-Type':'text/html'}); res.end(d2);
+      }); return;
     }
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200,{'Content-Type':MIME[path.extname(fp)]||'application/octet-stream'});
     res.end(data);
   });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-initDB().then(() => {
-  server.listen(PORT, '0.0.0.0', () => {
-    const os = require('os');
-    const ips = Object.values(os.networkInterfaces()).flat()
-      .filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
+ensureFile();
+initDB().then(()=>{
+  server.listen(PORT,'0.0.0.0',()=>{
+    const ips = Object.values(require('os').networkInterfaces()).flat()
+      .filter(i=>i.family==='IPv4'&&!i.internal).map(i=>i.address);
     console.log('\n🏛  Smart Campus Guide Server');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`   Local:   http://localhost:${PORT}`);
-    ips.forEach(ip => console.log(`   Network: http://${ip}:${PORT}`));
+    ips.forEach(ip=>console.log(`   Network: http://${ip}:${PORT}`));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   });
 });

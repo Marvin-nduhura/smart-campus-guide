@@ -8,9 +8,9 @@
     "dev": "node server.js"
   },
   "dependencies": {
-    "mongodb": "4.17.2"
+    "@libsql/client": "^0.6.0"
   },
-  "engines": { "node": ">=14" },
+  "engines": { "node": ">=18" },
   "keywords": ["pwa", "campus", "navigation", "kabale-university"],
   "author": "Kabale University",
   "license": "MIT"
