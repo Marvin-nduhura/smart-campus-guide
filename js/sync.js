@@ -54,9 +54,8 @@ const Sync = (() => {
     } catch (_) { return false; }
   }
 
-  // ── Push a write to server (with retry) ─────────────────────────────────────
+  // ── Push a write to server (with retry) — returns server item with canonical ID
   async function push(store, data) {
-    // Try up to 3 times
     for (let i = 0; i < 3; i++) {
       try {
         const ctrl = new AbortController();
@@ -68,12 +67,21 @@ const Sync = (() => {
           signal: ctrl.signal
         });
         clearTimeout(t);
-        if (r.ok) { serverAvailable = true; return true; }
+        if (r.ok) {
+          serverAvailable = true;
+          const saved = await r.json();
+          // If server assigned a different ID, fix local IndexedDB
+          if (saved && saved.id && saved.id !== data.id) {
+            await DB._delete(store, data.id);
+            await DB._put(store, saved);
+          }
+          return saved;
+        }
       } catch (_) {}
       await new Promise(res => setTimeout(res, 1000 * (i + 1)));
     }
     serverAvailable = false;
-    return false;
+    return null;
   }
 
   // ── Push a delete to server ──────────────────────────────────────────────────
@@ -116,14 +124,13 @@ const Sync = (() => {
     return DB.dbGetAll(store);
   }
 
-  // ── Called after every local write ──────────────────────────────────────────
-  function afterWrite(store, data) {
-    // Broadcast to other tabs on same device
+  // ── Called after every local write — returns server item (with canonical ID)
+  async function afterWrite(store, data) {
     if (_channel) {
       try { _channel.postMessage({ type: 'upsert', store, data }); } catch (_) {}
     }
-    // Push to server (async, don't block UI)
-    push(store, data);
+    const saved = await push(store, data);
+    return saved || data;
   }
 
   // ── Called after every local delete ─────────────────────────────────────────
