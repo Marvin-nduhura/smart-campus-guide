@@ -262,11 +262,13 @@ const UI = (() => {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       _installPrompt = e;
-      _showInstallButtons();
-      // Show banner after 2s on first visit
-      setTimeout(() => {
-        if (!sessionStorage.getItem('install_dismissed')) showInstallBanner();
-      }, 2000);
+      // Only show install UI if user is logged in (not on login page)
+      if (Auth.isLoggedIn()) {
+        _showInstallButtons();
+        setTimeout(() => {
+          if (!sessionStorage.getItem('install_dismissed')) showInstallBanner();
+        }, 2000);
+      }
     });
 
     window.addEventListener('appinstalled', () => {
@@ -277,18 +279,17 @@ const UI = (() => {
       showToast('App installed successfully!', 'success');
     });
 
-    // iOS Safari — no beforeinstallprompt, show manual instructions
-    if (_isIos()) {
+    // iOS Safari
+    if (_isIos() && Auth.isLoggedIn()) {
       _showInstallButtons();
       setTimeout(() => {
         if (!sessionStorage.getItem('install_dismissed')) showInstallBanner();
       }, 2000);
     }
 
-    // Fallback: if after 4s no prompt fired and not iOS, still show the button
-    // so users on supported browsers can see it (some browsers delay the event)
+    // Fallback: show button after 4s only if logged in
     setTimeout(() => {
-      if (!_isInStandaloneMode()) _showInstallButtons();
+      if (!_isInStandaloneMode() && Auth.isLoggedIn()) _showInstallButtons();
     }, 4000);
   }
 

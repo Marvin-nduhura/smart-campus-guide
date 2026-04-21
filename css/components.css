@@ -36,8 +36,8 @@
 .visitor-info p { color: #6b7280; font-size: 0.88rem; margin-bottom: 16px; }
 .visitor-features { list-style: none; text-align: left; display: inline-block; }
 .visitor-features li { padding: 4px 0; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
-.visitor-features .fa-check-circle { color: var(--primary); }
-.visitor-features .fa-circle-xmark { color: var(--text-muted); }
+.feat-yes { color: var(--primary); font-weight: 700; font-size: 1rem; }
+.feat-no  { color: var(--text-muted); font-weight: 700; font-size: 1rem; }
 .dashboard-content { padding-left: 0; padding-right: 0; max-width: 100%; }
 .dashboard-hero {
   margin-top: var(--nav-h); padding: 24px 20px 20px;
