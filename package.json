@@ -7,6 +7,9 @@
     "start": "node server.js",
     "dev": "node server.js"
   },
+  "dependencies": {
+    "mongodb": "^6.3.0"
+  },
   "engines": { "node": ">=14" },
   "keywords": ["pwa", "campus", "navigation", "kabale-university"],
   "author": "Kabale University",

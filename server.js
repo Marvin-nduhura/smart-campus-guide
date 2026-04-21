@@ -1,35 +1,13 @@
 /**
- * Smart Campus Guide – Shared Data Server
- * Enables multiple users on different devices to share data in real time.
+ * Smart Campus Guide – Server with MongoDB Atlas persistence
  * Run: node server.js
- * Then open: http://YOUR_IP:3000
  */
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'db.json');
-
-// ── Ensure data directory & file exist ────────────────────────────────────────
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'));
-}
-if (!fs.existsSync(DATA_FILE)) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify({
-    buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: []
-  }, null, 2));
-}
-
-function readDB() {
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-  catch (_) { return { buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: [] }; }
-}
-
-function writeDB(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
+const MONGO_URI = process.env.MONGO_URI || null;
 
 // ── MIME types ────────────────────────────────────────────────────────────────
 const MIME = {
@@ -38,101 +16,158 @@ const MIME = {
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webp': 'image/webp'
 };
 
-// ── SSE clients for real-time push ────────────────────────────────────────────
+// ── SSE clients ───────────────────────────────────────────────────────────────
 const sseClients = new Set();
-
 function pushToClients(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   sseClients.forEach(res => { try { res.write(msg); } catch (_) { sseClients.delete(res); } });
 }
 
+// ── DB layer (MongoDB or fallback JSON file) ──────────────────────────────────
+let dbLayer = null;
+
+async function initDB() {
+  if (MONGO_URI) {
+    try {
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(MONGO_URI);
+      await client.connect();
+      const mdb = client.db('smart_campus');
+      console.log('   ✅ Connected to MongoDB Atlas');
+      dbLayer = {
+        async getAll(store) {
+          return mdb.collection(store).find({}).toArray();
+        },
+        async upsert(store, data) {
+          await mdb.collection(store).replaceOne({ id: data.id }, data, { upsert: true });
+          return data;
+        },
+        async remove(store, id) {
+          await mdb.collection(store).deleteOne({ id: Number(id) });
+        }
+      };
+    } catch (e) {
+      console.error('   ⚠️  MongoDB connection failed, falling back to JSON file:', e.message);
+      dbLayer = makeFileDB();
+    }
+  } else {
+    console.log('   ℹ️  No MONGO_URI set, using local JSON file');
+    dbLayer = makeFileDB();
+  }
+}
+
+function makeFileDB() {
+  const fs = require('fs');
+  const DATA_FILE = path.join(__dirname, 'data', 'db.json');
+  if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(
+      { buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: [] }, null, 2
+    ));
+  }
+  function read() {
+    try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
+    catch (_) { return { buildings: [], rooms: [], bookings: [], notifications: [], users: [], timetable: [] }; }
+  }
+  function write(data) { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
+  return {
+    async getAll(store) { return read()[store] || []; },
+    async upsert(store, data) {
+      const db = read();
+      if (!db[store]) db[store] = [];
+      const idx = db[store].findIndex(i => i.id === data.id);
+      if (idx >= 0) db[store][idx] = data; else db[store].push(data);
+      write(db); return data;
+    },
+    async remove(store, id) {
+      const db = read();
+      if (!db[store]) return;
+      db[store] = db[store].filter(i => i.id !== Number(id));
+      write(db);
+    }
+  };
+}
+
 // ── Request handler ───────────────────────────────────────────────────────────
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
 
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // ── SSE endpoint for real-time updates ──────────────────────────────────────
+  // SSE
   if (pathname === '/api/events') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
     res.write('data: connected\n\n');
     sseClients.add(res);
     req.on('close', () => sseClients.delete(res));
     return;
   }
 
-  // ── Ping ────────────────────────────────────────────────────────────────────
+  // Ping
   if (pathname === '/api/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, time: new Date().toISOString() }));
     return;
   }
 
-  // ── API routes ───────────────────────────────────────────────────────────────
+  // API routes
   const apiMatch = pathname.match(/^\/api\/(\w+)\/?(\d+)?$/);
   if (apiMatch) {
     const store = apiMatch[1];
     const id = apiMatch[2] ? parseInt(apiMatch[2]) : null;
-    const db = readDB();
-    if (!db[store]) { res.writeHead(404); res.end('Not found'); return; }
+    const validStores = ['buildings', 'rooms', 'bookings', 'notifications', 'users', 'timetable'];
+    if (!validStores.includes(store)) { res.writeHead(404); res.end('Not found'); return; }
 
-    if (req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      if (id !== null) {
-        const item = db[store].find(i => i.id === id);
-        res.end(JSON.stringify(item || null));
-      } else {
-        res.end(JSON.stringify(db[store]));
-      }
-      return;
-    }
-
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(body || '{}');
-        if (req.method === 'POST') {
-          // Upsert by id
-          const idx = db[store].findIndex(i => i.id === data.id);
-          if (idx >= 0) db[store][idx] = data;
-          else db[store].push(data);
-          writeDB(db);
-          pushToClients('update', { store, data });
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(data));
-        } else if (req.method === 'DELETE' && id !== null) {
-          db[store] = db[store].filter(i => i.id !== id);
-          writeDB(db);
-          pushToClients('delete', { store, id });
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true }));
+    try {
+      if (req.method === 'GET') {
+        const items = await dbLayer.getAll(store);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (id !== null) {
+          res.end(JSON.stringify(items.find(i => i.id === id) || null));
         } else {
-          res.writeHead(405); res.end('Method not allowed');
+          // Strip MongoDB _id field
+          res.end(JSON.stringify(items.map(({ _id, ...rest }) => rest)));
         }
-      } catch (e) {
-        res.writeHead(400); res.end('Bad request');
+        return;
       }
-    });
+
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const data = JSON.parse(body || '{}');
+          if (req.method === 'POST') {
+            const saved = await dbLayer.upsert(store, data);
+            pushToClients('update', { store, data: saved });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(saved));
+          } else if (req.method === 'DELETE' && id !== null) {
+            await dbLayer.remove(store, id);
+            pushToClients('delete', { store, id });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+          } else {
+            res.writeHead(405); res.end('Method not allowed');
+          }
+        } catch (e) { res.writeHead(400); res.end('Bad request'); }
+      });
+    } catch (e) {
+      res.writeHead(500); res.end('Server error');
+    }
     return;
   }
 
-  // ── Static file serving ───────────────────────────────────────────────────
+  // Static files
+  const fs = require('fs');
   let filePath = pathname === '/' ? '/index.html' : pathname;
   filePath = path.join(__dirname, filePath);
   const ext = path.extname(filePath);
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      // SPA fallback
       fs.readFile(path.join(__dirname, 'index.html'), (e2, d2) => {
         if (e2) { res.writeHead(404); res.end('Not found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -145,13 +180,16 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  const interfaces = require('os').networkInterfaces();
-  const ips = Object.values(interfaces).flat().filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
-  console.log('\n🏛  Smart Campus Guide Server');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`   Local:   http://localhost:${PORT}`);
-  ips.forEach(ip => console.log(`   Network: http://${ip}:${PORT}  ← share this with others`));
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('   All users on the same network can now share data!\n');
+// ── Start ─────────────────────────────────────────────────────────────────────
+initDB().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    const os = require('os');
+    const ips = Object.values(os.networkInterfaces()).flat()
+      .filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
+    console.log('\n🏛  Smart Campus Guide Server');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`   Local:   http://localhost:${PORT}`);
+    ips.forEach(ip => console.log(`   Network: http://${ip}:${PORT}`));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  });
 });
