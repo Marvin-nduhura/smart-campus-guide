@@ -31,12 +31,8 @@ async function initDB() {
     try {
       const { MongoClient } = require('mongodb');
       const client = new MongoClient(MONGO_URI, {
-        tls: true,
-        tlsAllowInvalidCertificates: true,
-        tlsAllowInvalidHostnames: true,
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-        socketTimeoutMS: 10000
+        serverSelectionTimeoutMS: 15000,
+        connectTimeoutMS: 15000
       });
       await client.connect();
       const mdb = client.db('smart_campus');

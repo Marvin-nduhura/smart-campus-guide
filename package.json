@@ -4,11 +4,11 @@
   "description": "Smart Campus Guide PWA for Kabale University",
   "main": "server.js",
   "scripts": {
-    "start": "node --openssl-legacy-provider server.js",
+    "start": "node server.js",
     "dev": "node server.js"
   },
   "dependencies": {
-    "mongodb": "^6.3.0"
+    "mongodb": "4.17.2"
   },
   "engines": { "node": ">=14" },
   "keywords": ["pwa", "campus", "navigation", "kabale-university"],
