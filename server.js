@@ -7,7 +7,11 @@ const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 3000;
-const MONGO_URI = process.env.MONGO_URI || null;
+const MONGO_URI = process.env.MONGO_URI
+  ? process.env.MONGO_URI.includes('retryWrites')
+    ? process.env.MONGO_URI
+    : process.env.MONGO_URI + (process.env.MONGO_URI.includes('?') ? '&' : '?') + 'retryWrites=true&w=majority&tls=true'
+  : null;
 
 // ── MIME types ────────────────────────────────────────────────────────────────
 const MIME = {
@@ -30,7 +34,12 @@ async function initDB() {
   if (MONGO_URI) {
     try {
       const { MongoClient } = require('mongodb');
-      const client = new MongoClient(MONGO_URI);
+      const client = new MongoClient(MONGO_URI, {
+        tls: true,
+        tlsAllowInvalidCertificates: false,
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000
+      });
       await client.connect();
       const mdb = client.db('smart_campus');
       console.log('   ✅ Connected to MongoDB Atlas');
