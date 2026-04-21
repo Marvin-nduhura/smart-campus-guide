@@ -47,6 +47,8 @@ async function initDB() {
         `);
       }
       console.log('   ✅ Connected to PostgreSQL database');
+      // Seed default admin if no users exist
+      await seedDefaultUsers();
     } catch(e) {
       console.error('   ⚠️  PostgreSQL failed, using JSON file:', e.message);
       pgPool = null;
@@ -73,6 +75,28 @@ async function pgUpsert(store, item) {
 
 async function pgDelete(store, id) {
   await pgPool.query(`DELETE FROM ${store} WHERE id=$1`, [Number(id)]);
+}
+
+async function seedDefaultUsers() {
+  try {
+    const r = await pgPool.query(`SELECT id FROM users LIMIT 1`);
+    if (r.rows.length > 0) return; // already seeded
+    const admin = {
+      id: 1, username: 'admin', password: 'admin123', role: 'admin',
+      name: 'System Administrator', email: 'admin@kab.ac.ug',
+      avatar: null, permissions: ['all'], createdAt: new Date().toISOString()
+    };
+    const student = {
+      id: 2, username: 'student1', password: 'student123', role: 'student',
+      name: 'John Mugisha', email: 'john@kab.ac.ug',
+      avatar: null, permissions: [], createdAt: new Date().toISOString()
+    };
+    await pgUpsert('users', admin);
+    await pgUpsert('users', student);
+    console.log('   ✅ Default users seeded (admin/admin123)');
+  } catch(e) {
+    console.error('   ⚠️  Seed failed:', e.message);
+  }
 }
 
 // ── JSON file fallback ────────────────────────────────────────────────────────
