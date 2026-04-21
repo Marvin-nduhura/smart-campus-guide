@@ -91,7 +91,7 @@ const Auth = (() => {
               <i class="fas fa-sign-in-alt"></i> Sign In
             </button>
             <div class="auth-hint">
-              <small><i class="fas fa-info-circle"></i> Demo: admin/admin123 or student1/student123</small>
+              <small><i class="fas fa-info-circle"></i> </small>
             </div>
           </div>
           <div id="visitor-tab" class="tab-content">
