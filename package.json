@@ -1,0 +1,14 @@
+{
+  "name": "smart-campus-guide",
+  "version": "1.0.0",
+  "description": "Smart Campus Guide PWA for Kabale University",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": { "node": ">=14" },
+  "keywords": ["pwa", "campus", "navigation", "kabale-university"],
+  "author": "Kabale University",
+  "license": "MIT"
+}

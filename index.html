@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0D47A1"/>
+  <meta name="description" content="Smart Campus Guide - Navigate Kabale University with ease"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="KU Campus"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <title>Smart Campus Guide – Kabale University</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" type="image/png" href="icons/icon-192.png"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/main.css"/>
+  <link rel="stylesheet" href="css/animations.css"/>
+  <link rel="stylesheet" href="css/components.css"/>
+</head>
+<body>
+  <div id="app">
+    <div class="splash-screen">
+      <div class="splash-logo">
+        <div class="splash-icon"><i class="fas fa-university"></i></div>
+        <h1>Smart Campus Guide</h1>
+        <p>Kabale University</p>
+        <div class="splash-loader">
+          <div class="loader-bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- App Scripts (order matters) -->
+  <script src="js/db.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/buildings.js"></script>
+  <script src="js/booking.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/timetable.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/app.js"></script>
+
+  <style>
+    .splash-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(135deg, #082d6b 0%, #0D47A1 50%, #1565C0 100%);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.5s ease;
+    }
+    .splash-logo { text-align: center; color: white; }
+    .splash-icon {
+      width: 100px; height: 100px; border-radius: 28px;
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 48px; margin: 0 auto 20px;
+      border: 2px solid rgba(255,214,0,0.6);
+      animation: pulse 2s ease infinite;
+    }
+    .splash-logo h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
+    .splash-logo p { font-size: 0.9rem; opacity: 0.8; margin-bottom: 32px; }
+    .splash-loader { width: 200px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; margin: 0 auto; }
+    .loader-bar { height: 100%; background: #FFD600; border-radius: 2px; animation: loadBar 1.5s ease forwards; }
+    @keyframes loadBar { from { width: 0; } to { width: 100%; } }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+  </style>
+</body>
+</html>

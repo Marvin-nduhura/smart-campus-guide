@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: KAB Forest Green -->
+  <rect width="512" height="512" rx="96" fill="#1B5E20"/>
+  <!-- Building body: white -->
+  <rect x="96" y="220" width="320" height="210" rx="8" fill="white" opacity="0.95"/>
+  <!-- Windows/doors: KAB green -->
+  <rect x="136" y="260" width="60" height="80" rx="6" fill="#1B5E20"/>
+  <rect x="226" y="260" width="60" height="80" rx="6" fill="#1B5E20"/>
+  <rect x="316" y="260" width="60" height="80" rx="6" fill="#1B5E20"/>
+  <!-- Main door: gold -->
+  <rect x="211" y="320" width="90" height="110" rx="6" fill="#C9A84C"/>
+  <!-- Roof: KAB gold -->
+  <polygon points="256,72 72,220 440,220" fill="#C9A84C"/>
+  <!-- Flagpole -->
+  <rect x="248" y="48" width="8" height="60" rx="2" fill="white"/>
+  <!-- Flag: KAB green -->
+  <rect x="256" y="48" width="40" height="26" rx="3" fill="#1B5E20"/>
+  <!-- Columns: gold -->
+  <rect x="140" y="220" width="14" height="210" rx="4" fill="#C9A84C" opacity="0.6"/>
+  <rect x="358" y="220" width="14" height="210" rx="4" fill="#C9A84C" opacity="0.6"/>
+</svg>
