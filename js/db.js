@@ -116,6 +116,12 @@ async function dbGetByIndex(store, indexName, value) {
 }
 
 async function seedDefaultData() {
+  // If server is reachable, it handles seeding — skip local seed
+  try {
+    const r = await fetch('/api/ping', { cache: 'no-store' });
+    if (r.ok) return; // server is up, it seeds its own data
+  } catch(_) {}
+  // Offline fallback — seed local IndexedDB only if empty
   const users = await dbGetAll(STORES.users);
   if (users.length === 0) {
     await dbAdd(STORES.users, {
