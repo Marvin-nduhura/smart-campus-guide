@@ -79,21 +79,18 @@ async function pgDelete(store, id) {
 
 async function seedDefaultUsers() {
   try {
-    const r = await pgPool.query(`SELECT id FROM users LIMIT 1`);
-    if (r.rows.length > 0) return; // already seeded
+    // Always ensure the default admin exists — safe to run on every startup
     const admin = {
       id: 1, username: 'admin', password: 'admin123', role: 'admin',
       name: 'System Administrator', email: 'admin@kab.ac.ug',
       avatar: null, permissions: ['all'], createdAt: new Date().toISOString()
     };
-    const student = {
-      id: 2, username: 'student1', password: 'student123', role: 'student',
-      name: 'John Mugisha', email: 'john@kab.ac.ug',
-      avatar: null, permissions: [], createdAt: new Date().toISOString()
-    };
-    await pgUpsert('users', admin);
-    await pgUpsert('users', student);
-    console.log('   ✅ Default users seeded (admin/admin123)');
+    // INSERT ... ON CONFLICT DO NOTHING — won't overwrite if admin already exists
+    await pgPool.query(
+      `INSERT INTO users(id, data) VALUES($1, $2) ON CONFLICT(id) DO NOTHING`,
+      [admin.id, JSON.stringify(admin)]
+    );
+    console.log('   ✅ Default admin ensured (admin/admin123)');
   } catch(e) {
     console.error('   ⚠️  Seed failed:', e.message);
   }
@@ -234,17 +231,19 @@ const server = http.createServer(async (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 ensureFile();
-// Seed admin into JSON file if users array is empty
+// Always ensure default admin exists in JSON file fallback
 (function seedJsonFile() {
   const d = readFile();
-  if (!d.users || d.users.length === 0) {
-    d.users = [{
+  if (!d.users) d.users = [];
+  const hasAdmin = d.users.some(u => u.username === 'admin');
+  if (!hasAdmin) {
+    d.users.unshift({
       id: 1, username: 'admin', password: 'admin123', role: 'admin',
       name: 'System Administrator', email: 'admin@kab.ac.ug',
       avatar: null, permissions: ['all'], createdAt: new Date().toISOString()
-    }];
+    });
     writeFile(d);
-    console.log('   ✅ Default admin seeded into JSON file (admin/admin123)');
+    console.log('   ✅ Default admin ensured in JSON file (admin/admin123)');
   }
 })();
 initDB().then(() => {
