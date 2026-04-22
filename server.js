@@ -164,47 +164,24 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { username, password } = JSON.parse(body || '{}');
-        console.log(`   🔐 Login attempt: username="${username}" db=${pgPool ? 'postgres' : 'file'}`);
         const users = await getAll('users');
-        console.log(`   🔐 Users in DB: ${users.length}, usernames: ${users.map(u => u.username).join(', ')}`);
         const user = users.find(u => u.username === username && u.password === password);
         if (user) {
-          console.log(`   ✅ Login success: ${username}`);
           const { password: _, ...safeUser } = user;
           res.writeHead(200, {'Content-Type':'application/json'});
           res.end(JSON.stringify({ success: true, user: safeUser }));
         } else {
-          const userExists = users.find(u => u.username === username);
-          console.log(`   ❌ Login failed: user ${userExists ? 'found but wrong password' : 'not found'}`);
           res.writeHead(401, {'Content-Type':'application/json'});
           res.end(JSON.stringify({ success: false, message: 'Invalid username or password' }));
         }
       } catch(e) {
-        console.error('   ❌ Login error:', e.message);
         res.writeHead(400); res.end('Bad request');
       }
     });
     return;
   }
 
-  // Debug endpoint — check admin exists (remove after debugging)
-  if (pathname === '/api/debug-admin' && req.method === 'GET') {
-    try {
-      const users = await getAll('users');
-      const admin = users.find(u => u.username === 'admin');
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({
-        db: pgPool ? 'postgres' : 'file',
-        totalUsers: users.length,
-        adminExists: !!admin,
-        adminPasswordCorrect: admin ? admin.password === 'admin123' : false,
-        adminData: admin ? { id: admin.id, username: admin.username, role: admin.role, passwordLength: (admin.password||'').length } : null
-      }));
-    } catch(e) {
-      res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
-    }
-    return;
-  }
+
 
   // API routes
   const m = pathname.match(/^\/api\/(\w+)\/?(\d+)?$/);
