@@ -79,15 +79,16 @@ async function pgDelete(store, id) {
 
 async function seedDefaultUsers() {
   try {
-    // Always ensure the default admin exists — safe to run on every startup
+    // Always force-upsert the default admin — guarantees admin/admin123 works even
+    // if a previous deploy stored a different password or corrupted data
     const admin = {
       id: 1, username: 'admin', password: 'admin123', role: 'admin',
       name: 'System Administrator', email: 'admin@kab.ac.ug',
       avatar: null, permissions: ['all'], createdAt: new Date().toISOString()
     };
-    // INSERT ... ON CONFLICT DO NOTHING — won't overwrite if admin already exists
     await pgPool.query(
-      `INSERT INTO users(id, data) VALUES($1, $2) ON CONFLICT(id) DO NOTHING`,
+      `INSERT INTO users(id, data) VALUES($1, $2)
+       ON CONFLICT(id) DO UPDATE SET data = EXCLUDED.data`,
       [admin.id, JSON.stringify(admin)]
     );
     console.log('   ✅ Default admin ensured (admin/admin123)');
