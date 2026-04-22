@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ku-campus-v1';
+﻿const CACHE_NAME = 'ku-campus-v3';
 const ASSETS = [
   '/',
   '/index.html',
@@ -38,6 +38,26 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+
+  // Never cache API calls
+  if (url.pathname.startsWith('/api/')) return;
+
+  // For JS/CSS files: network first, fall back to cache (ensures fresh code after deploys)
+  if (url.pathname.startsWith('/js/') || url.pathname.startsWith('/css/')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // For everything else: cache first, fall back to network
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
