@@ -1,4 +1,4 @@
-// Authentication module
+﻿// Authentication module
 const Auth = (() => {
   let currentUser = null;
 
@@ -34,12 +34,28 @@ const Auth = (() => {
   function isLoggedIn() { return !!getCurrentUser(); }
 
   async function login(username, password) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        signal: ctrl.signal
+      });
+      clearTimeout(t);
+      const result = await r.json();
+      if (result.success) {
+        setCurrentUser(result.user);
+        return { success: true, user: result.user };
+      }
+      return { success: false, message: result.message || 'Invalid username or password' };
+    } catch (err) {
+      console.warn('Server unreachable, trying local fallback');
+    }
     const users = await DB.dbGetAll(DB.STORES.users);
     const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
-      return { success: true, user };
-    }
+    if (user) { setCurrentUser(user); return { success: true, user }; }
     return { success: false, message: 'Invalid username or password' };
   }
 
@@ -59,9 +75,7 @@ const Auth = (() => {
       </div>
       <div class="auth-container animate-slide-up">
         <div class="auth-logo">
-          <div class="logo-circle">
-            <i class="fas fa-university"></i>
-          </div>
+          <div class="logo-circle"><i class="fas fa-university"></i></div>
           <h1>Smart Campus Guide</h1>
           <p>Kabale University</p>
         </div>
@@ -90,7 +104,6 @@ const Auth = (() => {
             <button class="btn-primary btn-full" onclick="Auth.handleLogin()">
               <i class="fas fa-sign-in-alt"></i> Sign In
             </button>
-            
           </div>
           <div id="visitor-tab" class="tab-content">
             <div class="visitor-info">
