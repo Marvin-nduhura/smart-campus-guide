@@ -39,15 +39,17 @@ const Timetable = (() => {
     DAYS.forEach(d => byDay[d].sort((a, b) => a.startTime.localeCompare(b.startTime)));
 
     return `
-    <div class="week-grid">
-      ${DAYS.map(day => `
-      <div class="day-column">
-        <div class="day-header ${isToday(day) ? 'today' : ''}">${day.slice(0, 3)}</div>
-        <div class="day-slots">
-          ${byDay[day].length ? byDay[day].map(e => renderTimetableEntry(e, roomMap)).join('') :
-            `<div class="empty-day"><i class="fas fa-coffee"></i></div>`}
-        </div>
-      </div>`).join('')}
+    <div class="week-grid-wrap">
+      <div class="week-grid">
+        ${DAYS.map(day => `
+        <div class="day-column">
+          <div class="day-header ${isToday(day) ? 'today' : ''}">${day.slice(0, 3)}</div>
+          <div class="day-slots">
+            ${byDay[day].length ? byDay[day].map(e => renderTimetableEntry(e, roomMap)).join('') :
+              `<div class="empty-day"><i class="fas fa-coffee"></i></div>`}
+          </div>
+        </div>`).join('')}
+      </div>
     </div>`;
   }
 

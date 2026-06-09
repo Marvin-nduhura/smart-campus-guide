@@ -1,4 +1,4 @@
-﻿// Authentication module
+// Authentication module
 const Auth = (() => {
   let currentUser = null;
 
@@ -34,6 +34,7 @@ const Auth = (() => {
   function isLoggedIn() { return !!getCurrentUser(); }
 
   async function login(username, password) {
+    // Always hit the server endpoint — works even when local IndexedDB is empty
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 8000);
@@ -53,6 +54,7 @@ const Auth = (() => {
     } catch (err) {
       console.warn('Server unreachable, trying local fallback');
     }
+    // Offline fallback only
     const users = await DB.dbGetAll(DB.STORES.users);
     const user = users.find(u => u.username === username && u.password === password);
     if (user) { setCurrentUser(user); return { success: true, user }; }

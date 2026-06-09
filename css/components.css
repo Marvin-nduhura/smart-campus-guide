@@ -231,7 +231,9 @@
 .timetable-view-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
 .view-btn { padding: 8px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; background: white; border: 1.5px solid #e5e7eb; color: #6b7280; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
 .view-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; overflow-x: auto; min-width: 600px; }
+/* Wrapper makes the grid scroll horizontally without disrupting page scroll or bottom nav */
+.week-grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(72px, 1fr)); gap: 6px; min-width: 520px; }
 .day-column { min-width: 80px; }
 .day-header { text-align: center; font-size: 0.75rem; font-weight: 700; padding: 8px 4px; border-radius: 8px; color: #6b7280; background: white; margin-bottom: 6px; }
 .day-header.today { background: var(--primary); color: white; }
@@ -341,8 +343,7 @@
   .admin-stats { grid-template-columns: repeat(2, 1fr); }
   .week-grid { grid-template-columns: repeat(7, minmax(70px, 1fr)); }
   .map-page { bottom: var(--bottom-nav-h); }
-}
-@media (min-width: 768px) {
+}@media (min-width: 768px) {
   .map-page { bottom: 0; }
   .dashboard-content { padding-left: 16px; padding-right: 16px; max-width: 900px; margin: 0 auto; }
   .dashboard-hero { border-radius: 0 0 24px 24px; }

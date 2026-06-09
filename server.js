@@ -7,7 +7,9 @@ const path = require('path');
 const fs   = require('fs');
 
 const PORT         = process.env.PORT         || 3000;
-const DATABASE_URL = process.env.DATABASE_URL || null;
+const DATABASE_URL = process.env.DATABASE_URL
+  || 'postgresql://smartcampusdb:f0lIQhCuKdj9MqSkkzqb6QZh7P5Q68kF@dpg-d8jrpmgg4nts73cmr690-a/smartcampusdb_cij0'
+  || null;
 
 const STORES = ['buildings','rooms','bookings','notifications','users','timetable'];
 
